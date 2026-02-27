@@ -127,4 +127,14 @@ public class PromptController {
                                         @Valid @RequestBody RatingRequest req) {
         return ResponseEntity.ok(promptService.rate(id, req.getStars()));
     }
+
+    // ---------------------------------------------------------------
+    // Summary
+    // ---------------------------------------------------------------
+
+    /** Regenerate the AI summary for a prompt via Gemini. */
+    @PostMapping("/{id}/summarize")
+    public ResponseEntity<Prompt> summarize(@PathVariable String id) {
+        return ResponseEntity.ok(promptService.regenerateSummary(id));
+    }
 }

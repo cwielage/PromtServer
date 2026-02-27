@@ -17,6 +17,12 @@ app:
     secret: "promptvault-super-secret-key-change-me-in-production-min-32-chars"
     expiration-ms: 86400000   # 24 hours
 
+  gemini:
+    # Get your free API key at https://aistudio.google.com/apikey
+    api-key: "YOUR_GEMINI_API_KEY_HERE"
+    base-url: "https://generativelanguage.googleapis.com"
+    model: "gemini-1.5-flash"
+
 # CORS is configured in the WebConfig class — see config/WebConfig.java
 
 logging:

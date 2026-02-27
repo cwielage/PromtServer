@@ -51,6 +51,12 @@ public class Prompt {
     /** Logical grouping category (e.g. "coding", "writing", "summarisation") */
     private String category;
 
+    /**
+     * Short AI-generated (or manually set) summary of what this prompt does.
+     * Populated automatically by GeminiService on create/update.
+     */
+    private String summary;
+
     // ---------------------------------------------------------------
     // Rating  (1–5 stars, averaged over all submitted ratings)
     // ---------------------------------------------------------------

@@ -31,6 +31,7 @@ public class PromptService {
 
     private final PromptRepository promptRepository;
     private final MongoTemplate mongoTemplate;
+    private final GeminiService geminiService;
 
     // ---------------------------------------------------------------
     // CRUD
@@ -48,6 +49,8 @@ public class PromptService {
                 .timestamp(LocalDateTime.now())
                 .build();
 
+        String summary = geminiService.summarize(req.getContent()).orElse(null);
+
         Prompt prompt = Prompt.builder()
                 .title(req.getTitle())
                 .content(req.getContent())
@@ -55,6 +58,7 @@ public class PromptService {
                 .author(req.getAuthor())
                 .keywords(req.getKeywords() != null ? req.getKeywords() : new ArrayList<>())
                 .category(req.getCategory())
+                .summary(summary)
                 .versions(new ArrayList<>(List.of(initialVersion)))
                 .build();
 
@@ -96,6 +100,8 @@ public class PromptService {
         if (req.getCategory() != null) {
             existing.setCategory(req.getCategory());
         }
+        // Regenerate summary when content changes
+        geminiService.summarize(req.getContent()).ifPresent(existing::setSummary);
 
         return promptRepository.save(existing);
     }
@@ -142,6 +148,21 @@ public class PromptService {
         prompt.setContent(target.getContent());
         prompt.setContentHash(target.getContentHash());
 
+        return promptRepository.save(prompt);
+    }
+
+    // ---------------------------------------------------------------
+    // Summary
+    // ---------------------------------------------------------------
+
+    /** (Re-)generates the AI summary for an existing prompt via Gemini. */
+    public Prompt regenerateSummary(String id) {
+        Prompt prompt = findById(id);
+        String summary = geminiService.summarize(prompt.getContent())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.SERVICE_UNAVAILABLE,
+                        "Gemini API is not configured or returned no result"));
+        prompt.setSummary(summary);
         return promptRepository.save(prompt);
     }
 
