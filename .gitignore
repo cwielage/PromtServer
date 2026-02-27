@@ -1,0 +1,43 @@
+# Maven
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# IDE - IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# IDE - Eclipse / NetBeans
+.project
+.classpath
+.settings/
+nbproject/
+nb-configuration.xml
+nbactions.xml
+
+# IDE - VS Code
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Secrets / environment overrides
+application-local.yml
+application-local.properties
+application-secrets.yml
+.env
+
+# Spring Boot fat jar
+*.jar
+*.war
+
+# Compiled class files
+*.class
