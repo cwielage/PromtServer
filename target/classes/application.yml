@@ -4,9 +4,7 @@ spring:
 
   data:
     mongodb:
-      uri: mongodb://localhost:27017/promptdb
-      # For a secured MongoDB instance, use:
-      # uri: mongodb://user:password@localhost:27017/promptdb
+      uri: mongodb+srv://promptvault_db_user:Y10UMwcRyfZV4wDg@cluster0.4yc47z.mongodb.net/promptdb?appName=Cluster0
 
 server:
   port: 8080
@@ -29,3 +27,5 @@ logging:
   level:
     com.lafayette.promptserver: DEBUG
     org.springframework.data.mongodb: INFO
+    # Suppress the harmless Atlas thread shutdown warnings from embedded Tomcat
+    org.apache.catalina.loader.WebappClassLoaderBase: ERROR
