@@ -16,7 +16,8 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addMapping("/api/**")
                 .allowedOrigins(
                         "http://localhost:3000",   // React dev server (npm start)
-                        "http://localhost:5173"    // Vite dev server
+                        "http://localhost:5173",   // Vite dev server
+                        "https://lively-ground-06c5b3b0f.1.azurestaticapps.net"  // Azure SWA
                 )
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
