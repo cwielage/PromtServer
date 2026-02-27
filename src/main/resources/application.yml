@@ -1,0 +1,19 @@
+spring:
+  application:
+    name: prompt-server
+
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/promptdb
+      # For a secured MongoDB instance, use:
+      # uri: mongodb://user:password@localhost:27017/promptdb
+
+server:
+  port: 8080
+
+# CORS is configured in the WebConfig class — see config/WebConfig.java
+
+logging:
+  level:
+    com.lafayette.promptserver: DEBUG
+    org.springframework.data.mongodb: INFO
