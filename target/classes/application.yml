@@ -11,12 +11,6 @@ spring:
 server:
   port: 8080
 
-app:
-  jwt:
-    # Change this to a long random string in production!
-    secret: "promptvault-super-secret-key-change-me-in-production-min-32-chars"
-    expiration-ms: 86400000   # 24 hours
-
 # CORS is configured in the WebConfig class — see config/WebConfig.java
 
 logging:
