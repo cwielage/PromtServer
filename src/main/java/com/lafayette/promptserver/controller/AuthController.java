@@ -45,7 +45,7 @@ public class AuthController {
         String token = jwtUtil.generateToken(userDetails);
 
         User user = userRepository.findByUsername(req.getUsername()).orElseThrow();
-        return ResponseEntity.ok(new AuthResponse(token, user.getUsername(), user.getRoles()));
+        return ResponseEntity.ok(new AuthResponse(token, user.getUsername(), user.getDisplayName(), user.getRoles()));
     }
 
     @PostMapping("/register")
@@ -57,6 +57,7 @@ public class AuthController {
 
         User user = User.builder()
                 .username(req.getUsername())
+                .displayName(req.getDisplayName())
                 .password(passwordEncoder.encode(req.getPassword()))
                 .build();
 
@@ -66,6 +67,6 @@ public class AuthController {
         UserDetails userDetails = userDetailsService.loadUserByUsername(req.getUsername());
         String token = jwtUtil.generateToken(userDetails);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(new AuthResponse(token, user.getUsername(), user.getRoles()));
+                .body(new AuthResponse(token, user.getUsername(), user.getDisplayName(), user.getRoles()));
     }
 }

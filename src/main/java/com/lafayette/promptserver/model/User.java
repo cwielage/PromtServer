@@ -25,6 +25,9 @@ public class User {
     @Indexed(unique = true)
     private String username;
 
+    /** Human-readable display name shown as author. */
+    private String displayName;
+
     /** BCrypt-hashed password — never stored in plain text. */
     private String password;
 
