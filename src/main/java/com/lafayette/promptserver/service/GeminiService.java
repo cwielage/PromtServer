@@ -50,7 +50,6 @@ public class GeminiService {
      * @return the summary, or empty if the API call fails / is not configured
      */
     public Optional<String> summarize(String promptContent) {
-        log.debug("DEBUG GEMINIAPIKEY='{}'", apiKey);
         if (!enabled) {
             return Optional.empty();
         }
