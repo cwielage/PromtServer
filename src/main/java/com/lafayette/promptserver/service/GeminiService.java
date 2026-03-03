@@ -23,16 +23,20 @@ public class GeminiService {
     // ── System instructions ───────────────────────────────────────────────────
 
     private static final String SUMMARY_SYSTEM =
-            "You are a technical documentation specialist for an AI prompt library.\n" +
-            "Your job is to write concise, informative summaries that help users instantly\n" +
-            "understand what a prompt does without reading the full text.\n\n" +
-            "A good summary:\n" +
-            "- States the primary purpose and use case in the first sentence\n" +
-            "- Mentions the AI persona or role if one is defined in the prompt\n" +
-            "- Notes any key output format, tone, or special constraints\n" +
-            "- Is 2–3 sentences maximum\n" +
-            "- Matches the language of the original prompt (German prompt → German summary)\n\n" +
-            "Reply with the summary text only — no bullet points, no headers, no markdown, no preamble.";
+            "You are a senior prompt librarian writing catalogue descriptions for an AI prompt collection.\n" +
+            "Your goal is to write a rich, informative summary that tells the reader exactly what this prompt\n" +
+            "does, who it is useful for, and what kind of output it produces.\n\n" +
+            "A great summary covers ALL of the following in flowing prose:\n" +
+            "1. PURPOSE — What task or problem does this prompt solve? What is the core use case?\n" +
+            "2. PERSONA / ROLE — What expert role or AI persona does the prompt establish, if any?\n" +
+            "3. INPUTS — What information or context does the user need to provide (e.g. [Variable] placeholders)?\n" +
+            "4. OUTPUT — What does the result look like? (format, length, tone, structure)\n" +
+            "5. UNIQUE VALUE — What makes this prompt effective or special compared to a generic instruction?\n\n" +
+            "Writing rules:\n" +
+            "- Write 4–6 complete sentences in fluent, engaging prose — not bullet points.\n" +
+            "- Be specific and concrete; avoid vague filler phrases like 'this prompt helps you'.\n" +
+            "- Matches the language of the original prompt exactly (German prompt → German summary).\n" +
+            "- Reply with the summary text only — no headers, no markdown, no preamble, no sign-off.";
 
     private static final String OPTIMIZE_SYSTEM =
             "You are a world-class AI prompt engineer specializing in crafting high-performance\n" +
@@ -93,14 +97,14 @@ public class GeminiService {
     // ── Public methods ────────────────────────────────────────────────────────
 
     /**
-     * Generates a 2-3 sentence summary using the fast model (no thinking overhead).
+     * Generates a rich summary using the fast model (no thinking overhead).
      */
     public Optional<String> summarize(String promptContent) {
         if (!enabled) return Optional.empty();
 
         String userMessage = "Write a summary for this AI prompt:\n\n" + promptContent;
 
-        Optional<String> result = call(fastModel, SUMMARY_SYSTEM, userMessage, 300, 0.2);
+        Optional<String> result = call(fastModel, SUMMARY_SYSTEM, userMessage, 600, 0.4);
         result.ifPresent(s -> log.info("Gemini summary: {}", s));
         return result;
     }
