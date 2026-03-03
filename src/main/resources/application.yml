@@ -5,7 +5,7 @@ spring:
   data:
     mongodb:
       uri: mongodb+srv://promptvault_db_user:Y10UMwcRyfZV4wDg@cluster0.4yc47z.mongodb.net/promptdb?appName=Cluster0
-           
+
 server:
   port: 8080
 
@@ -17,7 +17,7 @@ app:
 
   gemini:
     # Get your free API key at https://aistudio.google.com/apikey
-    api-key: "AIzaSyBfPYdFI2Z6ecr_h5Y5ShJGzVKjLlx36zg"
+    api-key: "-------"
     base-url: "https://generativelanguage.googleapis.com"
     model: "gemini-1.5-flash"
 
