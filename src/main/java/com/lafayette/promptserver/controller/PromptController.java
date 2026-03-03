@@ -26,6 +26,19 @@ public class PromptController {
     private final PromptService promptService;
 
     // ---------------------------------------------------------------
+    // Meta (distinct values for form dropdowns)
+    // ---------------------------------------------------------------
+
+    /** GET /api/prompts/meta — returns all distinct categories and keywords. */
+    @GetMapping("/meta")
+    public ResponseEntity<Map<String, Object>> meta() {
+        return ResponseEntity.ok(Map.of(
+                "categories", promptService.getDistinctCategories(),
+                "keywords",   promptService.getDistinctKeywords()
+        ));
+    }
+
+    // ---------------------------------------------------------------
     // List / Search  (paginated)
     // ---------------------------------------------------------------
 

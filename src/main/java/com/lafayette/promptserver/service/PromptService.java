@@ -24,6 +24,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -246,6 +247,28 @@ public class PromptService {
         long count = mongoTemplate.count(Query.of(query).limit(-1).skip(-1), Prompt.class);
 
         return PageableExecutionUtils.getPage(results, pageable, () -> count);
+    }
+
+    // ---------------------------------------------------------------
+    // Meta (distinct values for form dropdowns)
+    // ---------------------------------------------------------------
+
+    /** Returns all distinct non-blank category values, sorted alphabetically. */
+    public List<String> getDistinctCategories() {
+        return mongoTemplate.findDistinct(new Query(), "category", Prompt.class, String.class)
+                .stream()
+                .filter(s -> s != null && !s.isBlank())
+                .sorted()
+                .collect(Collectors.toList());
+    }
+
+    /** Returns all distinct non-blank keyword values, sorted alphabetically. */
+    public List<String> getDistinctKeywords() {
+        return mongoTemplate.findDistinct(new Query(), "keywords", Prompt.class, String.class)
+                .stream()
+                .filter(s -> s != null && !s.isBlank())
+                .sorted()
+                .collect(Collectors.toList());
     }
 
     // ---------------------------------------------------------------

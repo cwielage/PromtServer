@@ -100,7 +100,9 @@ public class GeminiService {
 
         String userMessage = "Write a summary for this AI prompt:\n\n" + promptContent;
 
-        return call(fastModel, SUMMARY_SYSTEM, userMessage, 300, 0.2);
+        Optional<String> result = call(fastModel, SUMMARY_SYSTEM, userMessage, 300, 0.2);
+        result.ifPresent(s -> log.info("Gemini summary: {}", s));
+        return result;
     }
 
     /**
