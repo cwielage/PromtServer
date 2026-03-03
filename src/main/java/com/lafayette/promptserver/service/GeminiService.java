@@ -11,12 +11,47 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Calls the Gemini REST API to generate a short summary of a prompt's content.
+ * Calls the Gemini REST API for summarisation and prompt optimisation.
+ * Uses the systemInstruction + contents format for best model performance.
  * If the API key is not configured the service silently returns empty.
  */
 @Slf4j
 @Service
 public class GeminiService {
+
+    // ── System instructions ───────────────────────────────────────────────────
+
+    private static final String SUMMARY_SYSTEM =
+            "You are a technical documentation specialist for an AI prompt library.\n" +
+            "Your job is to write concise, informative summaries that help users instantly\n" +
+            "understand what a prompt does without reading the full text.\n\n" +
+            "A good summary:\n" +
+            "- States the primary purpose and use case in the first sentence\n" +
+            "- Mentions the AI persona or role if one is defined in the prompt\n" +
+            "- Notes any key output format, tone, or special constraints\n" +
+            "- Is 2–3 sentences maximum\n" +
+            "- Matches the language of the original prompt (German prompt → German summary)\n\n" +
+            "Reply with the summary text only — no bullet points, no headers, no markdown, no preamble.";
+
+    private static final String OPTIMIZE_SYSTEM =
+            "You are a world-class AI prompt engineer specializing in crafting high-performance\n" +
+            "prompts for large language models.\n\n" +
+            "Rewrite the given prompt by systematically applying these improvements:\n\n" +
+            "1. ROLE  — Open with a precise \"You are ...\" statement that establishes expertise and context.\n" +
+            "2. TASK  — State the objective explicitly and unambiguously.\n" +
+            "3. CONTEXT — Add relevant background, scope, or constraints the model needs to know.\n" +
+            "4. STEPS — For complex tasks, break the work into numbered reasoning steps.\n" +
+            "5. OUTPUT FORMAT — Specify structure, length, tone, and format of the expected response.\n" +
+            "6. GUARDRAILS — Include one or two constraints to keep the output focused and high-quality.\n\n" +
+            "Hard rules:\n" +
+            "- Return ONLY the optimized prompt text — nothing else.\n" +
+            "- Do NOT wrap the output in code blocks, quotes, or markdown.\n" +
+            "- Do NOT add explanations, commentary, or a preamble before or after.\n" +
+            "- Preserve the original language (German stays German, English stays English).\n" +
+            "- Keep all [Variable] placeholders exactly as they appear in the original.\n" +
+            "- Preserve the original intent — only improve clarity, structure, and effectiveness.";
+
+    // ── Fields ────────────────────────────────────────────────────────────────
 
     private final RestClient restClient;
     private final String apiKey;
@@ -26,7 +61,7 @@ public class GeminiService {
     public GeminiService(
             @Value("${app.gemini.api-key:}") String apiKey,
             @Value("${app.gemini.base-url:https://generativelanguage.googleapis.com}") String baseUrl,
-            @Value("${app.gemini.model:gemini-1.5-flash}") String model) {
+            @Value("${app.gemini.model:gemini-2.5-pro}") String model) {
 
         this.apiKey  = apiKey;
         this.model   = model;
@@ -38,85 +73,64 @@ public class GeminiService {
                 .baseUrl(baseUrl)
                 .build();
 
-        if (!this.enabled) {
-            log.info("GeminiService disabled — set app.gemini.api-key in application.yml to enable auto-summarisation");
+        if (this.enabled) {
+            log.info("GeminiService enabled — model: {}", model);
+        } else {
+            log.info("GeminiService disabled — set app.gemini.api-key to enable AI features");
         }
     }
 
+    // ── Public methods ────────────────────────────────────────────────────────
+
     /**
-     * Generates a 1-2 sentence summary of the given prompt content.
-     *
-     * @param promptContent the full text of the AI prompt
-     * @return the summary, or empty if the API call fails / is not configured
+     * Generates a 2-3 sentence summary of what the given prompt is designed to do.
      */
     public Optional<String> summarize(String promptContent) {
-        if (!enabled) {
-            return Optional.empty();
-        }
+        if (!enabled) return Optional.empty();
 
-        try {
-            String instruction =
-                    "Summarize the following AI prompt in 1-2 concise sentences. " +
-                    "Describe what task or behaviour the prompt is designed to achieve. " +
-                    "Reply with the summary only, no preamble.\n\n" + promptContent;
+        String userMessage = "Write a summary for this AI prompt:\n\n" + promptContent;
 
-            Map<String, Object> requestBody = Map.of(
-                    "contents", List.of(
-                            Map.of("parts", List.of(Map.of("text", instruction)))
-                    ),
-                    "generationConfig", Map.of(
-                            "maxOutputTokens", 150,
-                            "temperature", 0.3
-                    )
-            );
-
-            GeminiResponse response = restClient.post()
-                    .uri("/v1beta/models/{model}:generateContent?key={key}", model, apiKey)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(requestBody)
-                    .retrieve()
-                    .body(GeminiResponse.class);
-
-            if (response != null
-                    && response.candidates() != null
-                    && !response.candidates().isEmpty()) {
-
-                String text = response.candidates().get(0)
-                        .content().parts().get(0).text().trim();
-                return Optional.of(text);
-            }
-
-        } catch (Exception e) {
-            log.warn("Gemini summarisation failed: {}", e.getMessage());
-        }
-
-        return Optional.empty();
+        return call(SUMMARY_SYSTEM, userMessage, 300, 0.2);
     }
 
     /**
-     * Asks Gemini to rewrite and optimise the given prompt for use with AI models.
-     * Returns the improved prompt text, or empty if the API call fails / is not configured.
+     * Asks Gemini to rewrite and optimise the prompt using prompt-engineering best practices.
+     * Returns the improved text only — does NOT save anything.
      */
     public Optional<String> optimize(String promptContent) {
-        if (!enabled) {
-            return Optional.empty();
-        }
+        if (!enabled) return Optional.empty();
 
+        String userMessage = "Optimize this AI prompt:\n\n" + promptContent;
+
+        return call(OPTIMIZE_SYSTEM, userMessage, 4096, 0.4);
+    }
+
+    // ── Private helpers ───────────────────────────────────────────────────────
+
+    /**
+     * Sends a single-turn request to Gemini using the systemInstruction + contents format.
+     *
+     * @param systemInstruction the system-level behaviour instruction
+     * @param userMessage       the user-turn message
+     * @param maxTokens         maximum output tokens
+     * @param temperature       generation temperature
+     */
+    private Optional<String> call(String systemInstruction, String userMessage,
+                                  int maxTokens, double temperature) {
         try {
-            String instruction =
-                    "You are an expert AI prompt engineer. " +
-                    "Rewrite and optimize the following prompt to be clearer, more specific, " +
-                    "better structured, and more effective when used with AI language models. " +
-                    "Reply with the optimized prompt text only — no explanations, no preamble.\n\n"
-                    + promptContent;
-
             Map<String, Object> requestBody = Map.of(
+                    "systemInstruction", Map.of(
+                            "parts", List.of(Map.of("text", systemInstruction))
+                    ),
                     "contents", List.of(
-                            Map.of("parts", List.of(Map.of("text", instruction)))
+                            Map.of(
+                                    "role", "user",
+                                    "parts", List.of(Map.of("text", userMessage))
+                            )
                     ),
                     "generationConfig", Map.of(
-                            "maxOutputTokens", 2048,
-                            "temperature", 0.4
+                            "maxOutputTokens", maxTokens,
+                            "temperature", temperature
                     )
             );
 
@@ -131,19 +145,20 @@ public class GeminiService {
                     && response.candidates() != null
                     && !response.candidates().isEmpty()) {
 
-                String text = response.candidates().get(0)
-                        .content().parts().get(0).text().trim();
-                return Optional.of(text);
+                return Optional.of(
+                        response.candidates().get(0)
+                                .content().parts().get(0).text().trim()
+                );
             }
 
         } catch (Exception e) {
-            log.warn("Gemini optimisation failed: {}", e.getMessage());
+            log.warn("Gemini call failed (model={}): {}", model, e.getMessage());
         }
 
         return Optional.empty();
     }
 
-    // ── Response shape ───────────────────────────────────────────────────────
+    // ── Response shape ────────────────────────────────────────────────────────
 
     record GeminiResponse(List<Candidate> candidates) {}
     record Candidate(Content content) {}
