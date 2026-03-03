@@ -17,7 +17,7 @@ app:
 
   gemini:
     # Get your free API key at https://aistudio.google.com/apikey
-    api-key: "YOUR_GEMINI_API_KEY_HERE"
+    api-key: "AIzaSyBfPYdFI2Z6ecr_h5Y5ShJGzVKjLlx36zg"
     base-url: "https://generativelanguage.googleapis.com"
     model: "gemini-1.5-flash"
 
