@@ -22,6 +22,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -96,7 +97,7 @@ public class PromptService {
         existing.setTitle(req.getTitle());
         existing.setContent(req.getContent());
         existing.setContentHash(newHash);
-        existing.setAuthor(req.getAuthor());
+        // Do NOT update existing.author — keep original creator; version entry tracks who modified
         if (req.getKeywords() != null) {
             existing.setKeywords(req.getKeywords());
         }
@@ -255,25 +256,36 @@ public class PromptService {
 
     /**
      * Deletes a single version entry from the history.
-     * The current version (highest version number) cannot be deleted.
+     * If the current (latest) version is deleted, the prompt content rolls back
+     * to the new latest version automatically.
+     * The last remaining version cannot be deleted.
      */
     public Prompt deleteVersion(String id, int versionNumber) {
         Prompt prompt = findById(id);
+
+        if (prompt.getVersions().size() <= 1) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Cannot delete the only remaining version");
+        }
 
         int latestVersion = prompt.getVersions().stream()
                 .mapToInt(PromptVersion::getVersionNumber)
                 .max()
                 .orElse(1);
 
-        if (versionNumber == latestVersion) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Cannot delete the current version — revert to an older version first");
-        }
-
         boolean removed = prompt.getVersions().removeIf(v -> v.getVersionNumber() == versionNumber);
         if (!removed) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND,
                     "Version " + versionNumber + " not found");
+        }
+
+        // If the current version was deleted, roll back content to the new latest
+        if (versionNumber == latestVersion) {
+            PromptVersion newLatest = prompt.getVersions().stream()
+                    .max(Comparator.comparingInt(PromptVersion::getVersionNumber))
+                    .orElseThrow();
+            prompt.setContent(newLatest.getContent());
+            prompt.setContentHash(newLatest.getContentHash());
         }
 
         return promptRepository.save(prompt);
