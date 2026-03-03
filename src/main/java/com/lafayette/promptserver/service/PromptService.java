@@ -89,6 +89,8 @@ public class PromptService {
                 .timestamp(LocalDateTime.now())
                 .build();
 
+        boolean contentChanged = !existing.getContentHash().equals(newHash);
+
         existing.getVersions().add(newVersion);
         existing.setTitle(req.getTitle());
         existing.setContent(req.getContent());
@@ -100,8 +102,10 @@ public class PromptService {
         if (req.getCategory() != null) {
             existing.setCategory(req.getCategory());
         }
-        // Regenerate summary when content changes
-        geminiService.summarize(req.getContent()).ifPresent(existing::setSummary);
+        // Only call Gemini when content actually changed or there is no summary yet
+        if (contentChanged || existing.getSummary() == null || existing.getSummary().isBlank()) {
+            geminiService.summarize(req.getContent()).ifPresent(existing::setSummary);
+        }
 
         return promptRepository.save(existing);
     }
@@ -154,6 +158,18 @@ public class PromptService {
     // ---------------------------------------------------------------
     // Summary
     // ---------------------------------------------------------------
+
+    /**
+     * Asks Gemini to suggest an optimised version of the prompt content.
+     * Does NOT save anything — the caller decides whether to apply the result.
+     */
+    public String optimizePrompt(String id) {
+        Prompt prompt = findById(id);
+        return geminiService.optimize(prompt.getContent())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.SERVICE_UNAVAILABLE,
+                        "Gemini API is not configured or returned no result"));
+    }
 
     /** (Re-)generates the AI summary for an existing prompt via Gemini. */
     public Prompt regenerateSummary(String id) {

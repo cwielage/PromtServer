@@ -16,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/prompts")
@@ -136,5 +137,16 @@ public class PromptController {
     @PostMapping("/{id}/summarize")
     public ResponseEntity<Prompt> summarize(@PathVariable String id) {
         return ResponseEntity.ok(promptService.regenerateSummary(id));
+    }
+
+    /**
+     * Ask Gemini to suggest an optimised version of the prompt.
+     * Returns { "optimizedContent": "..." } without saving anything.
+     * The client can then call PUT /{id} to persist the result as a new version.
+     */
+    @PostMapping("/{id}/optimize")
+    public ResponseEntity<Map<String, String>> optimize(@PathVariable String id) {
+        String optimized = promptService.optimizePrompt(id);
+        return ResponseEntity.ok(Map.of("optimizedContent", optimized));
     }
 }

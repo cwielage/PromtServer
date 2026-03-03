@@ -50,6 +50,7 @@ public class GeminiService {
      * @return the summary, or empty if the API call fails / is not configured
      */
     public Optional<String> summarize(String promptContent) {
+        log.debug("DEBUG GEMINIAPIKEY='{}'", apiKey);
         if (!enabled) {
             return Optional.empty();
         }
@@ -88,6 +89,56 @@ public class GeminiService {
 
         } catch (Exception e) {
             log.warn("Gemini summarisation failed: {}", e.getMessage());
+        }
+
+        return Optional.empty();
+    }
+
+    /**
+     * Asks Gemini to rewrite and optimise the given prompt for use with AI models.
+     * Returns the improved prompt text, or empty if the API call fails / is not configured.
+     */
+    public Optional<String> optimize(String promptContent) {
+        if (!enabled) {
+            return Optional.empty();
+        }
+
+        try {
+            String instruction =
+                    "You are an expert AI prompt engineer. " +
+                    "Rewrite and optimize the following prompt to be clearer, more specific, " +
+                    "better structured, and more effective when used with AI language models. " +
+                    "Reply with the optimized prompt text only — no explanations, no preamble.\n\n"
+                    + promptContent;
+
+            Map<String, Object> requestBody = Map.of(
+                    "contents", List.of(
+                            Map.of("parts", List.of(Map.of("text", instruction)))
+                    ),
+                    "generationConfig", Map.of(
+                            "maxOutputTokens", 2048,
+                            "temperature", 0.4
+                    )
+            );
+
+            GeminiResponse response = restClient.post()
+                    .uri("/v1beta/models/{model}:generateContent?key={key}", model, apiKey)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(requestBody)
+                    .retrieve()
+                    .body(GeminiResponse.class);
+
+            if (response != null
+                    && response.candidates() != null
+                    && !response.candidates().isEmpty()) {
+
+                String text = response.candidates().get(0)
+                        .content().parts().get(0).text().trim();
+                return Optional.of(text);
+            }
+
+        } catch (Exception e) {
+            log.warn("Gemini optimisation failed: {}", e.getMessage());
         }
 
         return Optional.empty();
