@@ -3,6 +3,7 @@ package com.lafayette.promptserver.service;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
@@ -69,8 +70,14 @@ public class GeminiService {
                 && !apiKey.isBlank()
                 && !apiKey.equals("YOUR_GEMINI_API_KEY_HERE");
 
+        // gemini-2.5-pro (thinking model) can take 60-120 s — extend default timeouts
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(15_000);   // 15 s to establish connection
+        factory.setReadTimeout(180_000);     // 3 min to receive full response
+
         this.restClient = RestClient.builder()
                 .baseUrl(baseUrl)
+                .requestFactory(factory)
                 .build();
 
         if (this.enabled) {
