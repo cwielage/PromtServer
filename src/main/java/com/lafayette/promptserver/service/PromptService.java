@@ -250,6 +250,36 @@ public class PromptService {
     }
 
     // ---------------------------------------------------------------
+    // Version management
+    // ---------------------------------------------------------------
+
+    /**
+     * Deletes a single version entry from the history.
+     * The current version (highest version number) cannot be deleted.
+     */
+    public Prompt deleteVersion(String id, int versionNumber) {
+        Prompt prompt = findById(id);
+
+        int latestVersion = prompt.getVersions().stream()
+                .mapToInt(PromptVersion::getVersionNumber)
+                .max()
+                .orElse(1);
+
+        if (versionNumber == latestVersion) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Cannot delete the current version — revert to an older version first");
+        }
+
+        boolean removed = prompt.getVersions().removeIf(v -> v.getVersionNumber() == versionNumber);
+        if (!removed) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "Version " + versionNumber + " not found");
+        }
+
+        return promptRepository.save(prompt);
+    }
+
+    // ---------------------------------------------------------------
     // Meta (distinct values for form dropdowns)
     // ---------------------------------------------------------------
 

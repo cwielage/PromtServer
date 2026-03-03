@@ -143,6 +143,20 @@ public class PromptController {
     }
 
     // ---------------------------------------------------------------
+    // Version management
+    // ---------------------------------------------------------------
+
+    /**
+     * Deletes a single version entry from the history.
+     * The current (latest) version cannot be deleted.
+     */
+    @DeleteMapping("/{id}/versions/{version}")
+    public ResponseEntity<Prompt> deleteVersion(@PathVariable String id,
+                                                @PathVariable int version) {
+        return ResponseEntity.ok(promptService.deleteVersion(id, version));
+    }
+
+    // ---------------------------------------------------------------
     // Summary
     // ---------------------------------------------------------------
 
