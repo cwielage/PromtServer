@@ -141,14 +141,17 @@ public class GeminiService {
                     .retrieve()
                     .body(GeminiResponse.class);
 
-            if (response != null
-                    && response.candidates() != null
-                    && !response.candidates().isEmpty()) {
-
-                return Optional.of(
-                        response.candidates().get(0)
-                                .content().parts().get(0).text().trim()
-                );
+            // Thinking models (gemini-2.5-pro) may return multiple candidates/parts,
+            // some with null content or thought-only parts (no text). Iterate safely.
+            if (response != null && response.candidates() != null) {
+                for (Candidate candidate : response.candidates()) {
+                    if (candidate.content() == null || candidate.content().parts() == null) continue;
+                    for (Part part : candidate.content().parts()) {
+                        if (part != null && part.text() != null && !part.text().isBlank()) {
+                            return Optional.of(part.text().trim());
+                        }
+                    }
+                }
             }
 
         } catch (Exception e) {
