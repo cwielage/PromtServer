@@ -56,17 +56,20 @@ public class GeminiService {
 
     private final RestClient restClient;
     private final String apiKey;
-    private final String model;
+    private final String model;      // gemini-2.5-pro  — used for optimisation
+    private final String fastModel;  // gemini-2.5-flash — used for summaries
     private final boolean enabled;
 
     public GeminiService(
             @Value("${app.gemini.api-key:}") String apiKey,
             @Value("${app.gemini.base-url:https://generativelanguage.googleapis.com}") String baseUrl,
-            @Value("${app.gemini.model:gemini-2.5-pro}") String model) {
+            @Value("${app.gemini.model:gemini-2.5-pro}") String model,
+            @Value("${app.gemini.fast-model:gemini-2.5-flash}") String fastModel) {
 
-        this.apiKey  = apiKey;
-        this.model   = model;
-        this.enabled = apiKey != null
+        this.apiKey     = apiKey;
+        this.model      = model;
+        this.fastModel  = fastModel;
+        this.enabled    = apiKey != null
                 && !apiKey.isBlank()
                 && !apiKey.equals("YOUR_GEMINI_API_KEY_HERE");
 
@@ -81,7 +84,7 @@ public class GeminiService {
                 .build();
 
         if (this.enabled) {
-            log.info("GeminiService enabled — model: {}", model);
+            log.info("GeminiService enabled — optimize-model: {}, summary-model: {}", model, fastModel);
         } else {
             log.info("GeminiService disabled — set app.gemini.api-key to enable AI features");
         }
@@ -90,18 +93,22 @@ public class GeminiService {
     // ── Public methods ────────────────────────────────────────────────────────
 
     /**
-     * Generates a 2-3 sentence summary of what the given prompt is designed to do.
+     * Generates a 2-3 sentence summary using the fast model (no thinking overhead).
      */
     public Optional<String> summarize(String promptContent) {
         if (!enabled) return Optional.empty();
 
         String userMessage = "Write a summary for this AI prompt:\n\n" + promptContent;
 
-        return call(SUMMARY_SYSTEM, userMessage, 300, 0.2);
+        return call(fastModel, SUMMARY_SYSTEM, userMessage, 300, 0.2);
     }
 
     /**
      * Asks Gemini to rewrite and optimise the prompt using prompt-engineering best practices.
+     * Returns the improved text only — does NOT save anything.
+     */
+    /**
+     * Asks Gemini to rewrite and optimise the prompt using the full thinking model.
      * Returns the improved text only — does NOT save anything.
      */
     public Optional<String> optimize(String promptContent) {
@@ -109,7 +116,7 @@ public class GeminiService {
 
         String userMessage = "Optimize this AI prompt:\n\n" + promptContent;
 
-        return call(OPTIMIZE_SYSTEM, userMessage, 4096, 0.4);
+        return call(model, OPTIMIZE_SYSTEM, userMessage, 4096, 0.4);
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
@@ -117,12 +124,13 @@ public class GeminiService {
     /**
      * Sends a single-turn request to Gemini using the systemInstruction + contents format.
      *
+     * @param modelId           the model to use (fast-model or full model)
      * @param systemInstruction the system-level behaviour instruction
      * @param userMessage       the user-turn message
      * @param maxTokens         maximum output tokens
      * @param temperature       generation temperature
      */
-    private Optional<String> call(String systemInstruction, String userMessage,
+    private Optional<String> call(String modelId, String systemInstruction, String userMessage,
                                   int maxTokens, double temperature) {
         try {
             Map<String, Object> requestBody = Map.of(
@@ -142,7 +150,7 @@ public class GeminiService {
             );
 
             GeminiResponse response = restClient.post()
-                    .uri("/v1beta/models/{model}:generateContent?key={key}", model, apiKey)
+                    .uri("/v1beta/models/{model}:generateContent?key={key}", modelId, apiKey)
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(requestBody)
                     .retrieve()

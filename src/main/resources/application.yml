@@ -19,7 +19,8 @@ app:
     # Get your free API key at https://aistudio.google.com/apikey
     api-key: ${GEMINIAPIKEY:}
     base-url: "https://generativelanguage.googleapis.com"
-    model: "gemini-2.5-pro"
+    model: "gemini-2.5-pro"         # used for prompt optimisation (thinking model, thorough)
+    fast-model: "gemini-2.5-flash"  # used for summaries (fast, no thinking overhead)
 
 # CORS is configured in the WebConfig class — see config/WebConfig.java
 
