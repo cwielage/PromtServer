@@ -39,6 +39,9 @@ public class User {
     @Builder.Default
     private List<String> roles = List.of("ROLE_USER");
 
+    /** When true, the user must change their password on next login. */
+    private boolean mustChangePassword;
+
     @CreatedDate
     private LocalDateTime createdAt;
 }

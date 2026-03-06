@@ -56,7 +56,7 @@ public class AuthController {
         String tenantName = resolveTenantName(user.getTenantId());
         return ResponseEntity.ok(new AuthResponse(
                 token, user.getUsername(), user.getDisplayName(), user.getRoles(),
-                user.getTenantId(), tenantName));
+                user.getTenantId(), tenantName, user.isMustChangePassword()));
     }
 
     @PostMapping("/register")
@@ -109,7 +109,31 @@ public class AuthController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new AuthResponse(
                         token, user.getUsername(), user.getDisplayName(), user.getRoles(),
-                        tenantId, tenantName));
+                        tenantId, tenantName, false));
+    }
+
+    @PostMapping("/change-password")
+    public ResponseEntity<?> changePassword(@RequestBody Map<String, String> body,
+                                            org.springframework.security.core.Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("message", "Authentication required"));
+        }
+        String currentPassword = body.get("currentPassword");
+        String newPassword = body.get("newPassword");
+        if (currentPassword == null || newPassword == null || newPassword.length() < 6) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("message", "New password must be at least 6 characters"));
+        }
+        User user = userRepository.findByUsername(authentication.getName()).orElseThrow();
+        if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("message", "Current password is incorrect"));
+        }
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setMustChangePassword(false);
+        userRepository.save(user);
+        return ResponseEntity.ok(Map.of("message", "Password changed successfully"));
     }
 
     private String resolveTenantName(String tenantId) {

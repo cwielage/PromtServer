@@ -14,4 +14,5 @@ public class AuthResponse {
     private List<String> roles;
     private String tenantId;
     private String tenantName;
+    private boolean mustChangePassword;
 }

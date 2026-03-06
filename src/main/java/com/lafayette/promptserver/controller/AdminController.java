@@ -1,5 +1,6 @@
 package com.lafayette.promptserver.controller;
 
+import com.lafayette.promptserver.dto.CreateTenantResponse;
 import com.lafayette.promptserver.dto.ResetPasswordRequest;
 import com.lafayette.promptserver.dto.UpdateUserRequest;
 import com.lafayette.promptserver.dto.UserSummaryDto;
@@ -22,6 +23,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.security.SecureRandom;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -92,7 +94,7 @@ public class AdminController {
     }
 
     @PostMapping("/tenants")
-    public ResponseEntity<Tenant> createTenant(@RequestBody Map<String, String> body) {
+    public ResponseEntity<CreateTenantResponse> createTenant(@RequestBody Map<String, String> body) {
         String name = body.getOrDefault("name", "").trim();
         if (name.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tenant name is required");
@@ -100,8 +102,40 @@ public class AdminController {
         if (tenantRepository.existsByName(name)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "A tenant with this name already exists");
         }
-        Tenant tenant = Tenant.builder().name(name).build();
-        return ResponseEntity.status(HttpStatus.CREATED).body(tenantRepository.save(tenant));
+
+        // Create tenant
+        Tenant tenant = tenantRepository.save(Tenant.builder().name(name).build());
+
+        // Generate a unique admin username derived from the tenant name
+        String slug = name.toLowerCase().replaceAll("[^a-z0-9]+", "-").replaceAll("^-|-$", "");
+        String baseUsername = slug + "-admin";
+        String adminUsername = baseUsername;
+        int suffix = 2;
+        while (userRepository.existsByUsername(adminUsername)) {
+            adminUsername = baseUsername + suffix++;
+        }
+
+        // Generate a readable temporary password (letters + digits, no ambiguous chars)
+        String chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+        SecureRandom rng = new SecureRandom();
+        StringBuilder tempPwd = new StringBuilder(10);
+        for (int i = 0; i < 10; i++) {
+            tempPwd.append(chars.charAt(rng.nextInt(chars.length())));
+        }
+        String adminTempPassword = tempPwd.toString();
+
+        User adminUser = User.builder()
+                .username(adminUsername)
+                .displayName(name + " Admin")
+                .password(passwordEncoder.encode(adminTempPassword))
+                .roles(List.of("ROLE_USER", "ROLE_TENANT_ADMIN"))
+                .tenantId(tenant.getId())
+                .mustChangePassword(true)
+                .build();
+        userRepository.save(adminUser);
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new CreateTenantResponse(tenant, adminUsername, adminTempPassword));
     }
 
     @DeleteMapping("/tenants/{id}")
