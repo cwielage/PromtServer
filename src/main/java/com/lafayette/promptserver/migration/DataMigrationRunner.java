@@ -38,19 +38,13 @@ public class DataMigrationRunner implements ApplicationRunner {
         long orphanedUsers = mongoTemplate.count(noTenant, "users");
         long orphanedPrompts = mongoTemplate.count(noTenant, "prompts");
 
-        // Global admins intentionally have null tenantId — don't count them as "orphaned"
-        long adminCount = userRepository.findAll().stream()
-                .filter(u -> u.getTenantId() == null && u.getRoles().contains("ROLE_ADMIN"))
-                .count();
-        long usersToMigrate = orphanedUsers - adminCount;
-
-        if (usersToMigrate == 0 && orphanedPrompts == 0) {
+        if (orphanedUsers == 0 && orphanedPrompts == 0) {
             log.debug("DataMigration: nothing to migrate.");
             return;
         }
 
         log.info("DataMigration: found {} user(s) and {} prompt(s) without a tenant — migrating to 'Default' tenant.",
-                usersToMigrate, orphanedPrompts);
+                orphanedUsers, orphanedPrompts);
 
         // Get or create the "Default" tenant
         Tenant defaultTenant = tenantRepository.findByName("Default")
@@ -63,13 +57,13 @@ public class DataMigrationRunner implements ApplicationRunner {
 
         String tenantId = defaultTenant.getId();
 
-        // Migrate non-admin users with null tenantId
+        // Migrate ALL users with null tenantId (including admins with existing data)
         userRepository.findAll().stream()
-                .filter(u -> u.getTenantId() == null && !u.getRoles().contains("ROLE_ADMIN"))
+                .filter(u -> u.getTenantId() == null)
                 .forEach(u -> {
                     u.setTenantId(tenantId);
                     userRepository.save(u);
-                    log.info("DataMigration: user '{}' → Default tenant", u.getUsername());
+                    log.info("DataMigration: user '{}' (roles={}) → Default tenant", u.getUsername(), u.getRoles());
                 });
 
         // Migrate all prompts with null tenantId
