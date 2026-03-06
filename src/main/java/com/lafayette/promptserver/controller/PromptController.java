@@ -1,10 +1,12 @@
 package com.lafayette.promptserver.controller;
 
+import com.lafayette.promptserver.config.JwtUtil;
 import com.lafayette.promptserver.dto.PromptRequest;
 import com.lafayette.promptserver.dto.RatingRequest;
 import com.lafayette.promptserver.model.Prompt;
 import com.lafayette.promptserver.model.PromptVersion;
 import com.lafayette.promptserver.service.PromptService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -14,6 +16,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
@@ -24,36 +27,45 @@ import java.util.Map;
 public class PromptController {
 
     private final PromptService promptService;
+    private final JwtUtil jwtUtil;
+
+    // ---------------------------------------------------------------
+    // Tenant resolution helper
+    // ---------------------------------------------------------------
+
+    private String requireTenantId(HttpServletRequest request) {
+        String header = request.getHeader("Authorization");
+        if (header == null || !header.startsWith("Bearer ")) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing token");
+        }
+        String tenantId = jwtUtil.extractTenantId(header.substring(7));
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "No tenant assigned. Contact your administrator.");
+        }
+        return tenantId;
+    }
 
     // ---------------------------------------------------------------
     // Meta (distinct values for form dropdowns)
     // ---------------------------------------------------------------
 
-    /** GET /api/prompts/meta — returns all distinct categories and keywords. */
     @GetMapping("/meta")
-    public ResponseEntity<Map<String, Object>> meta() {
+    public ResponseEntity<Map<String, Object>> meta(HttpServletRequest request) {
+        String tenantId = requireTenantId(request);
         return ResponseEntity.ok(Map.of(
-                "categories", promptService.getDistinctCategories(),
-                "keywords",   promptService.getDistinctKeywords()
+                "categories", promptService.getDistinctCategories(tenantId),
+                "keywords",   promptService.getDistinctKeywords(tenantId)
         ));
     }
 
     // ---------------------------------------------------------------
-    // List / Search  (paginated)
+    // List / Search  (paginated, tenant-scoped)
     // ---------------------------------------------------------------
 
-    /**
-     * GET /api/prompts
-     *   ?q=       full-text search query
-     *   &keyword= keyword filter
-     *   &category= category filter
-     *   &author=  author filter
-     *   &page=0   (zero-based page index)
-     *   &size=20
-     *   &sort=createdAt,desc
-     */
     @GetMapping
     public ResponseEntity<Page<Prompt>> list(
+            HttpServletRequest request,
             @RequestParam(required = false) String q,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String category,
@@ -62,6 +74,8 @@ public class PromptController {
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "createdAt") String sortBy,
             @RequestParam(defaultValue = "desc") String sortDir) {
+
+        String tenantId = requireTenantId(request);
 
         Sort sort = sortDir.equalsIgnoreCase("asc")
                 ? Sort.by(sortBy).ascending()
@@ -75,8 +89,8 @@ public class PromptController {
                 || (author != null && !author.isBlank());
 
         Page<Prompt> result = hasSearch
-                ? promptService.search(q, keyword, category, author, pageable)
-                : promptService.findAll(pageable);
+                ? promptService.search(tenantId, q, keyword, category, author, pageable)
+                : promptService.findAll(tenantId, pageable);
 
         return ResponseEntity.ok(result);
     }
@@ -95,8 +109,10 @@ public class PromptController {
     // ---------------------------------------------------------------
 
     @PostMapping
-    public ResponseEntity<Prompt> create(@Valid @RequestBody PromptRequest req) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(promptService.create(req));
+    public ResponseEntity<Prompt> create(HttpServletRequest request,
+                                         @Valid @RequestBody PromptRequest req) {
+        String tenantId = requireTenantId(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(promptService.create(req, tenantId));
     }
 
     @PutMapping("/{id}")
@@ -115,16 +131,11 @@ public class PromptController {
     // Version history (git-like)
     // ---------------------------------------------------------------
 
-    /** Returns the full list of versions — newest last. */
     @GetMapping("/{id}/history")
     public ResponseEntity<List<PromptVersion>> history(@PathVariable String id) {
         return ResponseEntity.ok(promptService.getHistory(id));
     }
 
-    /**
-     * Reverts the prompt to a specific version number.
-     * The revert is recorded as a new version entry.
-     */
     @PostMapping("/{id}/revert/{version}")
     public ResponseEntity<Prompt> revert(@PathVariable String id,
                                           @PathVariable int version) {
@@ -135,7 +146,6 @@ public class PromptController {
     // Rating
     // ---------------------------------------------------------------
 
-    /** Submit a star rating (1–5) for a prompt. */
     @PostMapping("/{id}/rate")
     public ResponseEntity<Prompt> rate(@PathVariable String id,
                                         @Valid @RequestBody RatingRequest req) {
@@ -146,10 +156,6 @@ public class PromptController {
     // Version management
     // ---------------------------------------------------------------
 
-    /**
-     * Deletes a single version entry from the history.
-     * The current (latest) version cannot be deleted.
-     */
     @DeleteMapping("/{id}/versions/{version}")
     public ResponseEntity<Prompt> deleteVersion(@PathVariable String id,
                                                 @PathVariable int version) {
@@ -157,20 +163,14 @@ public class PromptController {
     }
 
     // ---------------------------------------------------------------
-    // Summary
+    // Summary / Optimize
     // ---------------------------------------------------------------
 
-    /** Regenerate the AI summary for a prompt via Gemini. */
     @PostMapping("/{id}/summarize")
     public ResponseEntity<Prompt> summarize(@PathVariable String id) {
         return ResponseEntity.ok(promptService.regenerateSummary(id));
     }
 
-    /**
-     * Ask Gemini to suggest an optimised version of the prompt.
-     * Returns { "optimizedContent": "..." } without saving anything.
-     * The client can then call PUT /{id} to persist the result as a new version.
-     */
     @PostMapping("/{id}/optimize")
     public ResponseEntity<Map<String, String>> optimize(@PathVariable String id) {
         String optimized = promptService.optimizePrompt(id);

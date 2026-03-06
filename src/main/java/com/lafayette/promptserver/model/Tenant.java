@@ -10,34 +10,22 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Document(collection = "users")
-public class User {
+@Document(collection = "tenants")
+public class Tenant {
 
     @Id
     private String id;
 
     @Indexed(unique = true)
-    private String username;
+    private String name;
 
-    /** Tenant this user belongs to. Null only for global ROLE_ADMIN. */
-    @Indexed
-    private String tenantId;
-
-    /** Human-readable display name shown as author. */
-    private String displayName;
-
-    /** BCrypt-hashed password — never stored in plain text. */
-    private String password;
-
-    /** e.g. ["ROLE_USER"] or ["ROLE_USER", "ROLE_ADMIN"] */
     @Builder.Default
-    private List<String> roles = List.of("ROLE_USER");
+    private boolean active = true;
 
     @CreatedDate
     private LocalDateTime createdAt;

@@ -25,16 +25,26 @@ public class JwtUtil {
     }
 
     public String generateToken(UserDetails userDetails) {
-        return Jwts.builder()
+        return generateToken(userDetails, null);
+    }
+
+    public String generateToken(UserDetails userDetails, String tenantId) {
+        var builder = Jwts.builder()
                 .subject(userDetails.getUsername())
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + expirationMs))
-                .signWith(key)
-                .compact();
+                .expiration(new Date(System.currentTimeMillis() + expirationMs));
+        if (tenantId != null) {
+            builder.claim("tenantId", tenantId);
+        }
+        return builder.signWith(key).compact();
     }
 
     public String extractUsername(String token) {
         return parseClaims(token).getSubject();
+    }
+
+    public String extractTenantId(String token) {
+        return (String) parseClaims(token).get("tenantId");
     }
 
     public boolean isValid(String token, UserDetails userDetails) {

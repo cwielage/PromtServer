@@ -39,7 +39,7 @@ public class PromptService {
     // CRUD
     // ---------------------------------------------------------------
 
-    public Prompt create(PromptRequest req) {
+    public Prompt create(PromptRequest req, String tenantId) {
         String hash = sha256(req.getContent());
 
         PromptVersion initialVersion = PromptVersion.builder()
@@ -54,6 +54,7 @@ public class PromptService {
         String summary = geminiService.summarize(req.getContent()).orElse(null);
 
         Prompt prompt = Prompt.builder()
+                .tenantId(tenantId)
                 .title(req.getTitle())
                 .content(req.getContent())
                 .contentHash(hash)
@@ -67,8 +68,11 @@ public class PromptService {
         return promptRepository.save(prompt);
     }
 
-    public Page<Prompt> findAll(Pageable pageable) {
-        return promptRepository.findAll(pageable);
+    public Page<Prompt> findAll(String tenantId, Pageable pageable) {
+        Query query = new Query(Criteria.where("tenantId").is(tenantId)).with(pageable);
+        List<Prompt> results = mongoTemplate.find(query, Prompt.class);
+        long count = mongoTemplate.count(Query.of(query).limit(-1).skip(-1), Prompt.class);
+        return PageableExecutionUtils.getPage(results, pageable, () -> count);
     }
 
     public Prompt findById(String id) {
@@ -202,26 +206,19 @@ public class PromptService {
     }
 
     // ---------------------------------------------------------------
-    // Search  (full-text + optional filters, with paging)
+    // Search  (full-text + optional filters + tenant scope)
     // ---------------------------------------------------------------
 
-    /**
-     * Searches prompts using MongoDB full-text search.
-     * Falls back to a keyword/category/author filter when {@code q} is blank.
-     *
-     * @param q        free-text query (searches title, content, keywords)
-     * @param keyword  exact keyword filter (optional)
-     * @param category category filter (optional)
-     * @param author   author filter (optional)
-     * @param pageable paging + sorting
-     */
-    public Page<Prompt> search(String q, String keyword, String category,
+    public Page<Prompt> search(String tenantId, String q, String keyword, String category,
                                String author, Pageable pageable) {
 
         boolean hasText = q != null && !q.isBlank();
 
         Query query = new Query().with(pageable);
         List<Criteria> filters = new ArrayList<>();
+
+        // Always scope to the tenant
+        filters.add(Criteria.where("tenantId").is(tenantId));
 
         if (keyword != null && !keyword.isBlank()) {
             filters.add(Criteria.where("keywords").regex(keyword, "i"));
@@ -234,13 +231,10 @@ public class PromptService {
         }
 
         if (hasText) {
-            // MongoDB text search
             TextCriteria textCriteria = TextCriteria.forDefaultLanguage().matchingAny(q.split("\\s+"));
             query = TextQuery.queryText(textCriteria).sortByScore().with(pageable);
-            if (!filters.isEmpty()) {
-                query.addCriteria(new Criteria().andOperator(filters.toArray(new Criteria[0])));
-            }
-        } else if (!filters.isEmpty()) {
+            query.addCriteria(new Criteria().andOperator(filters.toArray(new Criteria[0])));
+        } else {
             query.addCriteria(new Criteria().andOperator(filters.toArray(new Criteria[0])));
         }
 
@@ -292,21 +286,23 @@ public class PromptService {
     }
 
     // ---------------------------------------------------------------
-    // Meta (distinct values for form dropdowns)
+    // Meta (distinct values for form dropdowns — scoped to tenant)
     // ---------------------------------------------------------------
 
-    /** Returns all distinct non-blank category values, sorted alphabetically. */
-    public List<String> getDistinctCategories() {
-        return mongoTemplate.findDistinct(new Query(), "category", Prompt.class, String.class)
+    /** Returns all distinct non-blank category values for this tenant, sorted alphabetically. */
+    public List<String> getDistinctCategories(String tenantId) {
+        Query q = new Query(Criteria.where("tenantId").is(tenantId));
+        return mongoTemplate.findDistinct(q, "category", Prompt.class, String.class)
                 .stream()
                 .filter(s -> s != null && !s.isBlank())
                 .sorted()
                 .collect(Collectors.toList());
     }
 
-    /** Returns all distinct non-blank keyword values, sorted alphabetically. */
-    public List<String> getDistinctKeywords() {
-        return mongoTemplate.findDistinct(new Query(), "keywords", Prompt.class, String.class)
+    /** Returns all distinct non-blank keyword values for this tenant, sorted alphabetically. */
+    public List<String> getDistinctKeywords(String tenantId) {
+        Query q = new Query(Criteria.where("tenantId").is(tenantId));
+        return mongoTemplate.findDistinct(q, "keywords", Prompt.class, String.class)
                 .stream()
                 .filter(s -> s != null && !s.isBlank())
                 .sorted()

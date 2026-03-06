@@ -22,6 +22,9 @@ public class InvitationCode {
 
     private String code;
     private String createdBy;
+
+    /** The tenant the invited user will be assigned to. */
+    private String tenantId;
     private boolean used;
     private String usedBy;
 

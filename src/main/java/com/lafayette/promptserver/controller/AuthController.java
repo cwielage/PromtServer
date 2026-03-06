@@ -5,8 +5,10 @@ import com.lafayette.promptserver.dto.AuthResponse;
 import com.lafayette.promptserver.dto.LoginRequest;
 import com.lafayette.promptserver.dto.RegisterRequest;
 import com.lafayette.promptserver.model.InvitationCode;
+import com.lafayette.promptserver.model.Tenant;
 import com.lafayette.promptserver.model.User;
 import com.lafayette.promptserver.repository.InvitationCodeRepository;
+import com.lafayette.promptserver.repository.TenantRepository;
 import com.lafayette.promptserver.repository.UserRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +35,7 @@ public class AuthController {
     private final UserDetailsService userDetailsService;
     private final UserRepository userRepository;
     private final InvitationCodeRepository invitationCodeRepository;
+    private final TenantRepository tenantRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
 
@@ -46,11 +49,14 @@ public class AuthController {
                     .body(Map.of("message", "Invalid username or password"));
         }
 
-        UserDetails userDetails = userDetailsService.loadUserByUsername(req.getUsername());
-        String token = jwtUtil.generateToken(userDetails);
-
         User user = userRepository.findByUsername(req.getUsername()).orElseThrow();
-        return ResponseEntity.ok(new AuthResponse(token, user.getUsername(), user.getDisplayName(), user.getRoles()));
+        UserDetails userDetails = userDetailsService.loadUserByUsername(req.getUsername());
+        String token = jwtUtil.generateToken(userDetails, user.getTenantId());
+
+        String tenantName = resolveTenantName(user.getTenantId());
+        return ResponseEntity.ok(new AuthResponse(
+                token, user.getUsername(), user.getDisplayName(), user.getRoles(),
+                user.getTenantId(), tenantName));
     }
 
     @PostMapping("/register")
@@ -60,8 +66,8 @@ public class AuthController {
                     .body(Map.of("message", "Username already taken"));
         }
 
-        // First registered user gets admin role and skips the invite check.
-        // Every subsequent user must provide a valid, unused invitation code.
+        // First registered user gets global admin role; no tenant assigned.
+        // Every subsequent user must provide a valid, unused invitation code (which carries tenantId).
         boolean isFirstUser = userRepository.count() == 0;
         InvitationCode invite = null;
 
@@ -78,16 +84,18 @@ public class AuthController {
             }
         }
 
+        String tenantId = (invite != null) ? invite.getTenantId() : null;
+
         User user = User.builder()
                 .username(req.getUsername())
                 .displayName(req.getDisplayName())
                 .password(passwordEncoder.encode(req.getPassword()))
                 .roles(isFirstUser ? List.of("ROLE_USER", "ROLE_ADMIN") : List.of("ROLE_USER"))
+                .tenantId(tenantId)
                 .build();
 
         userRepository.save(user);
 
-        // Mark the invitation code as consumed
         if (invite != null) {
             invite.setUsed(true);
             invite.setUsedBy(user.getUsername());
@@ -96,8 +104,18 @@ public class AuthController {
         }
 
         UserDetails userDetails = userDetailsService.loadUserByUsername(req.getUsername());
-        String token = jwtUtil.generateToken(userDetails);
+        String token = jwtUtil.generateToken(userDetails, tenantId);
+        String tenantName = resolveTenantName(tenantId);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(new AuthResponse(token, user.getUsername(), user.getDisplayName(), user.getRoles()));
+                .body(new AuthResponse(
+                        token, user.getUsername(), user.getDisplayName(), user.getRoles(),
+                        tenantId, tenantName));
+    }
+
+    private String resolveTenantName(String tenantId) {
+        if (tenantId == null) return null;
+        return tenantRepository.findById(tenantId)
+                .map(Tenant::getName)
+                .orElse(null);
     }
 }

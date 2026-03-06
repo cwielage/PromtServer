@@ -12,4 +12,6 @@ public class AuthResponse {
     private String username;
     private String displayName;
     private List<String> roles;
+    private String tenantId;
+    private String tenantName;
 }

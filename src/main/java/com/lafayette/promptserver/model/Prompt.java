@@ -8,6 +8,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.index.TextIndexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -20,11 +21,15 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "prompts")
-@CompoundIndex(name = "category_author_idx", def = "{'category': 1, 'author': 1}")
+@CompoundIndex(name = "tenant_category_author_idx", def = "{'tenantId': 1, 'category': 1, 'author': 1}")
 public class Prompt {
 
     @Id
     private String id;
+
+    /** Tenant this prompt belongs to */
+    @Indexed
+    private String tenantId;
 
     /** Human-readable title of the prompt */
     @TextIndexed(weight = 3)

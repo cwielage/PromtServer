@@ -14,4 +14,6 @@ public class UserSummaryDto {
     private String displayName;
     private List<String> roles;
     private LocalDateTime createdAt;
+    private String tenantId;
+    private String tenantName;
 }
