@@ -13,7 +13,7 @@ app:
   jwt:
     # Change this to a long random string in production!
     secret: "promptvault-super-secret-key-change-me-in-production-min-32-chars"
-    expiration-ms: 86400000   # 24 hours
+    expiration-ms: 604800000  # 7 days
 
   gemini:
     # Get your free API key at https://aistudio.google.com/apikey
