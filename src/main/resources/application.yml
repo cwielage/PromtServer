@@ -5,6 +5,7 @@ spring:
   data:
     mongodb:
       uri: mongodb+srv://promptvault_db_user:Y10UMwcRyfZV4wDg@cluster0.4yc47z.mongodb.net/promptdb?appName=Cluster0
+      auto-index-creation: true
 
 server:
   port: 8080

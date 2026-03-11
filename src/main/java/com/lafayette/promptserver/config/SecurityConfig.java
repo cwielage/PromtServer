@@ -40,7 +40,7 @@ public class SecurityConfig {
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/health", "/").permitAll()   // Azure App Service keep-alive / health checks
+                .requestMatchers("/health", "/", "/error").permitAll()   // Azure App Service keep-alive / health checks + Spring error dispatch
                 .requestMatchers("/api/admin/**").hasAuthority("ROLE_ADMIN")
                 .requestMatchers("/api/tenant-admin/**").hasAnyAuthority("ROLE_TENANT_ADMIN", "ROLE_ADMIN")
                 .anyRequest().authenticated()

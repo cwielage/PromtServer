@@ -7,6 +7,7 @@ import com.lafayette.promptserver.repository.PromptRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -27,6 +28,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PromptService {
@@ -231,16 +233,26 @@ public class PromptService {
         }
 
         if (hasText) {
-            TextCriteria textCriteria = TextCriteria.forDefaultLanguage().matchingAny(q.split("\\s+"));
-            query = TextQuery.queryText(textCriteria).sortByScore().with(pageable);
-            query.addCriteria(new Criteria().andOperator(filters.toArray(new Criteria[0])));
-        } else {
-            query.addCriteria(new Criteria().andOperator(filters.toArray(new Criteria[0])));
+            try {
+                TextCriteria textCriteria = TextCriteria.forDefaultLanguage().matchingAny(q.split("\\s+"));
+                Query textQuery = TextQuery.queryText(textCriteria).sortByScore().with(pageable);
+                textQuery.addCriteria(new Criteria().andOperator(filters.toArray(new Criteria[0])));
+                List<Prompt> results = mongoTemplate.find(textQuery, Prompt.class);
+                long count = mongoTemplate.count(Query.of(textQuery).limit(-1).skip(-1), Prompt.class);
+                return PageableExecutionUtils.getPage(results, pageable, () -> count);
+            } catch (Exception e) {
+                log.warn("Full-text search failed (text index may not exist yet), falling back to regex search: {}", e.getMessage());
+                filters.add(new Criteria().orOperator(
+                        Criteria.where("title").regex(q, "i"),
+                        Criteria.where("content").regex(q, "i"),
+                        Criteria.where("keywords").regex(q, "i")
+                ));
+            }
         }
 
+        query.addCriteria(new Criteria().andOperator(filters.toArray(new Criteria[0])));
         List<Prompt> results = mongoTemplate.find(query, Prompt.class);
         long count = mongoTemplate.count(Query.of(query).limit(-1).skip(-1), Prompt.class);
-
         return PageableExecutionUtils.getPage(results, pageable, () -> count);
     }
 
