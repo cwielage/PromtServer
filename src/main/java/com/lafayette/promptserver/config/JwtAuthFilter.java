@@ -31,9 +31,15 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             @NonNull HttpServletResponse response,
             @NonNull FilterChain chain) throws ServletException, IOException {
 
+        String method = request.getMethod();
+        String uri = request.getRequestURI() + (request.getQueryString() != null ? "?" + request.getQueryString() : "");
         String authHeader = request.getHeader("Authorization");
 
+        log.info("JwtAuthFilter [{} {}] Authorization: {}", method, uri,
+                authHeader != null ? authHeader.substring(0, Math.min(30, authHeader.length())) + "..." : "MISSING");
+
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            log.warn("JwtAuthFilter [{} {}] no Bearer token — continuing unauthenticated", method, uri);
             chain.doFilter(request, response);
             return;
         }
@@ -43,9 +49,9 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         try {
             username = jwtUtil.extractUsername(token);
-            log.debug("JWT extracted username: {}", username);
+            log.info("JwtAuthFilter [{} {}] extracted username: {}", method, uri, username);
         } catch (Exception e) {
-            log.warn("JWT extractUsername failed: {}", e.getMessage());
+            log.warn("JwtAuthFilter [{} {}] extractUsername failed: {}", method, uri, e.getMessage());
             chain.doFilter(request, response);
             return;
         }
@@ -58,12 +64,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                             userDetails, null, userDetails.getAuthorities());
                     auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(auth);
-                    log.debug("JWT authenticated user: {}", username);
+                    log.info("JwtAuthFilter [{} {}] authenticated user: {} roles: {}", method, uri, username, userDetails.getAuthorities());
                 } else {
-                    log.warn("JWT isValid returned false for user: {}", username);
+                    log.warn("JwtAuthFilter [{} {}] isValid=false for user: {}", method, uri, username);
                 }
             } catch (Exception e) {
-                log.warn("JWT user lookup failed for {}: {}", username, e.getMessage());
+                log.warn("JwtAuthFilter [{} {}] user lookup failed for {}: {}", method, uri, username, e.getMessage());
             }
         }
 
