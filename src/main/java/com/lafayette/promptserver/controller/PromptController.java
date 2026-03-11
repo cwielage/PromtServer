@@ -36,14 +36,20 @@ public class PromptController {
     private String requireTenantId(HttpServletRequest request) {
         String header = request.getHeader("Authorization");
         if (header == null || !header.startsWith("Bearer ")) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing token");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tenant assigned.");
         }
-        String tenantId = jwtUtil.extractTenantId(header.substring(7));
-        if (tenantId == null) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
-                    "No tenant assigned. Contact your administrator.");
+        try {
+            String tenantId = jwtUtil.extractTenantId(header.substring(7));
+            if (tenantId == null) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                        "No tenant assigned. Contact your administrator.");
+            }
+            return tenantId;
+        } catch (ResponseStatusException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No tenant assigned.");
         }
-        return tenantId;
     }
 
     // ---------------------------------------------------------------
